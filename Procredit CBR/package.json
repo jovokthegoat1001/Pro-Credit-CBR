@@ -1,0 +1,22 @@
+{
+  "name": "procredit-cbr-builder",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n API,PY,VITE -c blue,yellow,green \"node api-server.js\" \"python extractor.py\" \"vite\"",
+    "build": "vite build",
+    "preview": "concurrently -n API,PY,VITE -c blue,yellow,green \"node api-server.js\" \"python extractor.py\" \"vite preview\"",
+    "api": "node api-server.js",
+    "extractor": "python extractor.py"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^4.7.76",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.0",
+    "vite": "^5.4.0"
+  }
+}

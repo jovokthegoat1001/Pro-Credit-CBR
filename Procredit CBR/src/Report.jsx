@@ -1,10 +1,17 @@
-// Report screen — redesigned Summary Page with PDF / Word export
-const { useState: useStateR } = React;
+import React, { useState as useStateR, useEffect as useEffectR } from "react";
+import PrintView from "./PrintView.jsx";
 
 // ── Shared components (unchanged) ────────────────────────────────────────────
 
-function Badge({ kind, children }) {
-  return <span className={`badge ${kind || ""}`}>{children}</span>;
+function Badge({ kind, children, wrap }) {
+  return (
+    <span
+      className={`badge ${kind || ""}`}
+      style={wrap ? { whiteSpace: "normal", lineHeight: 1.45, textTransform: "none" } : undefined}
+    >
+      {children}
+    </span>
+  );
 }
 
 function SubjectTable({ rows }) {
@@ -39,6 +46,79 @@ function SubjectTable({ rows }) {
         ))}
       </tbody>
     </table>
+  );
+}
+
+function GisSection({ gis }) {
+  if (!gis) return null;
+  return (
+    <div className="card">
+      <div className="card-head">
+        <div className="card-title"><span className="num">GIS</span>SEC General Information Sheet</div>
+        <div className="spacer"></div>
+        {gis.issueDate && <span className="pill mono">Filed {gis.issueDate}</span>}
+      </div>
+      <div className="card-pad">
+        <div className="meta-grid" style={{ marginBottom: 16 }}>
+          {[
+            { label: "Legal name",         val: gis.company },
+            { label: "SEC Reg",            val: gis.secReg,           mono: true },
+            { label: "TIN",                val: gis.tin,              mono: true },
+            { label: "Paid-up Capital",    val: gis.paidUpCapital },
+            { label: "Authorized Capital", val: gis.authorizedCapital },
+            { label: "Subscribed Capital", val: gis.subscribedCapital },
+            { label: "Line of Business",   val: gis.lineOfBusiness,   small: true },
+            { label: "Address",            val: gis.address,          small: true },
+          ].map((f, i) => (
+            <div key={i} className="meta-cell">
+              <div className="meta-label">{f.label}</div>
+              <div className={`meta-val${f.mono ? " mono" : ""}`} style={f.small ? { fontSize: 13 } : {}}>{f.val || "—"}</div>
+            </div>
+          ))}
+        </div>
+
+        {gis.officers?.length > 0 && (
+          <>
+            <div className="eyebrow" style={{ marginBottom: 8 }}>Officers &amp; Directors</div>
+            <table className="data" style={{ marginBottom: 16 }}>
+              <thead><tr><th>Name</th><th>Title / Role</th></tr></thead>
+              <tbody>
+                {gis.officers.map((o, i) => (
+                  <tr key={i}>
+                    <td style={{ fontFamily: "Source Sans 3, sans-serif", fontWeight: 600 }}>{o.name}</td>
+                    <td>{o.title}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+
+        {gis.shareholders?.length > 0 && (
+          <>
+            <div className="eyebrow" style={{ marginBottom: 8 }}>Shareholders</div>
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>Name</th><th>Nationality</th>
+                  <th className="num-cell">Shares</th><th className="num-cell">%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {gis.shareholders.map((s, i) => (
+                  <tr key={i}>
+                    <td style={{ fontFamily: "Source Sans 3, sans-serif", fontWeight: 600 }}>{s.name}</td>
+                    <td>{s.nationality}</td>
+                    <td className="num-cell">{s.shares}</td>
+                    <td className="num-cell">{s.pct}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -114,24 +194,41 @@ function ThreeWayTable({ rows }) {
     <div className="card">
       <div className="card-head">
         <div className="card-title"><span className="num">Δ</span>Three-way data match · GIS vs CRIF vs CBR</div>
+        <div className="spacer"></div>
+        <span className="muted small">{rows.length} data point{rows.length !== 1 ? "s" : ""}</span>
       </div>
-      <table className="data">
-        <thead>
-          <tr>
-            <th>Data point</th><th>GIS / SEC filing</th><th>CRIF report</th>
-            <th>CBR template</th><th style={{ width: "14%" }}>Verdict</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={i}>
-              <td style={{ fontFamily: "Source Sans 3, sans-serif", fontWeight: 600 }}>{r.dp}</td>
-              <td>{r.gis}</td><td>{r.crif}</td><td>{r.cbr}</td>
-              <td><Badge kind={r.verdictType}>{r.verdict}</Badge></td>
+      {rows.length === 0 ? (
+        <div className="card-pad" style={{ color: "var(--muted)", fontSize: 13 }}>
+          No reconciliation data generated.
+          <span style={{ display: "block", marginTop: 4, fontSize: 12 }}>
+            This table is built by the summary step — it requires at least a CRIF document.
+            If documents were uploaded and this is still empty, check the browser console for
+            <code style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 11, margin: "0 4px" }}>[claudeJSON]</code>
+            errors (usually a failed API call or malformed JSON response).
+          </span>
+        </div>
+      ) : (
+        <table className="data">
+          <thead>
+            <tr>
+              <th style={{ width: "15%" }}>Data point</th>
+              <th style={{ width: "17%" }}>GIS / SEC filing</th>
+              <th style={{ width: "17%" }}>CRIF report</th>
+              <th style={{ width: "17%" }}>CBR template</th>
+              <th style={{ width: "34%" }}>Verdict</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i}>
+                <td style={{ fontFamily: "Source Sans 3, sans-serif", fontWeight: 600 }}>{r.dp}</td>
+                <td>{r.gis}</td><td>{r.crif}</td><td>{r.cbr}</td>
+                <td><Badge kind={r.verdictType} wrap>{r.verdict}</Badge></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
@@ -144,38 +241,49 @@ function NamescanSection({ namescan, adverseMedia }) {
         <div className="spacer"></div>
         <span className="muted small">Source: Namescan.io — Emerald Dataset</span>
       </div>
-      <table className="data">
-        <thead>
-          <tr>
-            <th>Subject</th><th>Scan ID</th><th>Date</th>
-            <th>Sanctions / PEP</th><th>Adverse media</th><th style={{ width: "18%" }}>Conclusion</th>
-          </tr>
-        </thead>
-        <tbody>
-          {namescan.map((r, i) => (
-            <tr key={i}>
-              <td style={{ fontFamily: "Source Sans 3, sans-serif", fontWeight: 600 }}>{r.subject}</td>
-              <td>{r.scanId}</td><td>{r.date}</td><td>{r.sanctionsPep}</td><td>{r.adverse}</td>
-              <td><Badge kind={r.verdictType}>{r.verdict}</Badge></td>
+      {namescan.length === 0 ? (
+        <div className="card-pad" style={{ color: "var(--muted)", fontSize: 13 }}>
+          No Namescan data extracted.
+          <span style={{ display: "block", marginTop: 4, fontSize: 12 }}>
+            Upload a Namescan.io Emerald screening PDF in the Namescan slot to populate this section.
+          </span>
+        </div>
+      ) : (
+        <table className="data">
+          <thead>
+            <tr>
+              <th style={{ width: "22%" }}>Subject</th><th style={{ width: "9%" }}>Scan ID</th><th style={{ width: "9%" }}>Date</th>
+              <th style={{ width: "14%" }}>Sanctions / PEP</th><th style={{ width: "22%" }}>Adverse media</th><th style={{ width: "24%" }}>Conclusion</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {namescan.map((r, i) => (
+              <tr key={i}>
+                <td style={{ fontFamily: "Source Sans 3, sans-serif", fontWeight: 600 }}>{r.subject}</td>
+                <td>{r.scanId}</td><td>{r.date}</td><td>{r.sanctionsPep}</td><td>{r.adverse}</td>
+                <td><Badge kind={r.verdictType} wrap>{r.verdict}</Badge></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
       {adverseMedia?.length > 0 && (
         <div className="card-pad" style={{ borderTop: "1px solid var(--line)" }}>
           <div className="eyebrow" style={{ marginBottom: 10 }}>Adverse media detail · requires borrower clarification</div>
-          <table className="data" style={{ border: "1px solid var(--line)", borderRadius: 8, overflow: "hidden" }}>
+          <table className="data" style={{ border: "1px solid var(--line)", borderRadius: 8, overflow: "hidden", tableLayout: "fixed", width: "100%" }}>
             <thead>
               <tr>
-                <th>Source</th><th style={{ width: "44%" }}>Finding</th>
-                <th>Date</th><th style={{ width: "22%" }}>Assessment</th>
+                <th style={{ width: "20%" }}>Source</th>
+                <th style={{ width: "38%" }}>Finding</th>
+                <th style={{ width: "10%" }}>Date</th>
+                <th style={{ width: "32%" }}>Assessment</th>
               </tr>
             </thead>
             <tbody>
               {adverseMedia.map((a, i) => (
                 <tr key={i}>
                   <td>{a.source}</td><td>{a.finding}</td><td>{a.date}</td>
-                  <td><Badge kind={a.assessmentType}>{a.assessment}</Badge></td>
+                  <td><Badge kind={a.assessmentType} wrap>{a.assessment}</Badge></td>
                 </tr>
               ))}
             </tbody>
@@ -186,91 +294,136 @@ function NamescanSection({ namescan, adverseMedia }) {
   );
 }
 
+const FACILITY_TABS = [
+  { id: "installments",    label: "Installments",     amtLabel: "Financed amt" },
+  { id: "nonInstallments", label: "Non-installments", amtLabel: "Credit limit"  },
+  { id: "creditCards",     label: "Credit cards",     amtLabel: "Credit limit"  },
+];
+
 function FacilitiesSection({ facilities }) {
   const [tab, setTab] = useStateR("installments");
-  const isInst = tab === "installments";
-  const isCC   = tab === "creditCards";
-  const isNon  = tab === "nonInstallments";
-  const rows   = facilities[tab] || [];
-  const headLimitLabel = isInst ? "Financed amt" : "Credit limit";
+  const total = FACILITY_TABS.reduce((n, t) => n + (facilities[t.id]?.length || 0), 0);
 
   return (
     <div className="card">
       <div className="card-head">
         <div className="card-title"><span className="num">02</span>All reported facilities</div>
         <div className="spacer"></div>
-        <span className="muted small">{rows.length} accounts</span>
+        <span className="muted small">{total} accounts</span>
       </div>
-      <div style={{ padding: "12px 22px 0" }}>
+
+      {/* Tab bar — hidden when printing */}
+      <div style={{ padding: "12px 22px 0" }} className="no-print">
         <div className="tabs">
-          <button className={`tab${isInst ? " active" : ""}`} onClick={() => setTab("installments")}>
-            Installments · {(facilities.installments || []).length}
-          </button>
-          <button className={`tab${isNon ? " active" : ""}`} onClick={() => setTab("nonInstallments")}>
-            Non-installments · {(facilities.nonInstallments || []).length}
-          </button>
-          <button className={`tab${isCC ? " active" : ""}`} onClick={() => setTab("creditCards")}>
-            Credit cards · {(facilities.creditCards || []).length}
-          </button>
+          {FACILITY_TABS.map((t) => (
+            <button key={t.id} className={`tab${tab === t.id ? " active" : ""}`} onClick={() => setTab(t.id)}>
+              {t.label} · {facilities[t.id]?.length || 0}
+            </button>
+          ))}
         </div>
       </div>
-      <table className="data">
-        <thead>
-          <tr>
-            <th>Subject</th><th>Lender</th><th>Contract</th>
-            <th className="num-cell">{headLimitLabel}</th>
-            <th>Start</th><th>End</th><th>Status</th><th>Settled</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => {
-            const tone =
-              r.status === "CURRENT"           ? "green" :
-              r.status?.startsWith("CLOSED")   ? "slate" :
-              r.status === "PAST DUE"          ? "red"   : "slate";
-            return (
-              <tr key={i}>
-                <td style={{ fontFamily: "Source Sans 3, sans-serif", fontWeight: 600 }}>{r.subject}</td>
-                <td>{r.lender}</td><td>{r.contract}</td>
-                <td className="num-cell">{r.amount || r.limit}</td>
-                <td>{r.start}</td><td>{r.end}</td>
-                <td><Badge kind={tone}>{r.status}</Badge></td>
-                <td>{r.settled}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+
+      {/* All three panels — only active shown on screen; ALL shown when printing */}
+      {FACILITY_TABS.map((t) => {
+        const rows = facilities[t.id] || [];
+        return (
+          <div key={t.id} className={tab !== t.id ? "facility-panel-hidden" : undefined}>
+            {/* Section heading visible only in print */}
+            <div className="facility-print-label">{t.label} ({rows.length})</div>
+
+            {rows.length === 0 ? (
+              <div className="card-pad" style={{ color: "var(--muted)", fontSize: 13, fontStyle: "italic" }}>
+                No {t.label.toLowerCase()} found.
+                {total === 0 && <span> Upload a CIC document to extract facility data.</span>}
+              </div>
+            ) : (
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>Subject</th><th>Lender</th><th>Contract</th>
+                    <th className="num-cell">{t.amtLabel}</th>
+                    <th>Start</th><th>End</th><th>Status</th><th>Settled</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r, i) => {
+                    const tone =
+                      r.status === "CURRENT"         ? "green" :
+                      r.status?.startsWith("CLOSED") ? "slate" :
+                      r.status === "PAST DUE"        ? "red"   : "slate";
+                    return (
+                      <tr key={i}>
+                        <td style={{ fontFamily: "Source Sans 3, sans-serif", fontWeight: 600 }}>{r.subject}</td>
+                        <td>{r.lender}</td><td>{r.contract}</td>
+                        <td className="num-cell">{r.amount || r.limit}</td>
+                        <td>{r.start}</td><td>{r.end}</td>
+                        <td><Badge kind={tone}>{r.status}</Badge></td>
+                        <td>{r.settled}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 function RiskHero({ meta, rationale }) {
+  const rated     = meta.riskRating > 0;
   const riskColor =
     meta.riskRating >= 4 ? "var(--red)"   :
-    meta.riskRating >= 3 ? "var(--amber)" : "var(--green)";
+    meta.riskRating >= 3 ? "var(--amber)" :
+    meta.riskRating >= 1 ? "var(--green)" : "var(--muted)";
+
   return (
     <div className="card risk-hero">
+      {/* Left dark panel — score + tier */}
       <div className="risk-block">
         <div>
           <div className="risk-label">Risk rating</div>
-          <div className="risk-score">{meta.riskRating}<span className="denom">/ 5</span></div>
+          <div className="risk-score" style={{ color: rated ? undefined : "rgba(255,255,255,0.3)" }}>
+            {rated ? meta.riskRating : "—"}<span className="denom">/ 5</span>
+          </div>
         </div>
-        <div className="risk-tier">{meta.riskTier}</div>
+        <div className="risk-tier" style={{ color: rated ? undefined : "rgba(255,255,255,0.35)" }}>
+          {meta.riskTier || "PENDING"}
+        </div>
       </div>
+
+      {/* Right panel — risk line + rationale */}
       <div className="risk-text">
+        {meta.riskLine && (
+          <div style={{
+            fontSize: 13.5, fontWeight: 600, color: riskColor,
+            marginBottom: 14, paddingBottom: 12, borderBottom: "1px dashed var(--line)",
+          }}>
+            {meta.riskLine}
+          </div>
+        )}
+
         <div className="eyebrow" style={{ marginBottom: 8 }}>Rationale</div>
-        <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none" }}>
-          {(rationale || []).map((r, i) => (
-            <li key={i} style={{
-              padding: "6px 0",
-              borderBottom: i < rationale.length - 1 ? "1px dashed var(--line)" : "0",
-              fontSize: 13.5, color: "var(--ink-2)"
-            }}>
-              <span style={{ color: riskColor, marginRight: 8 }}>▸</span>{r}
-            </li>
-          ))}
-        </ul>
+
+        {(rationale || []).length === 0 ? (
+          <p className="muted small" style={{ fontStyle: "italic", margin: 0 }}>
+            Rationale will appear here after extraction completes. Upload documents and click "Extract &amp; build report".
+          </p>
+        ) : (
+          <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none" }}>
+            {rationale.map((r, i) => (
+              <li key={i} style={{
+                padding: "6px 0",
+                borderBottom: i < rationale.length - 1 ? "1px dashed var(--line)" : "0",
+                fontSize: 13.5, color: "var(--ink-2)",
+              }}>
+                <span style={{ color: riskColor, marginRight: 8 }}>▸</span>{r}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
@@ -394,23 +547,23 @@ async function generateWordDoc(data) {
   }
 
   b += `<h1 style="${H1S}">SECTION 2 — ALL REPORTED FACILITIES</h1>`;
-  const FC = ["Subject","Lender","Contract","Amount / Limit","Start","End","Status","Settled"];
+  const FC    = ["Subject","Lender","Contract","Amount / Limit","Start","End","Status","Settled"];
+  const EMPTY = `<p style="${PS}color:#aaa;font-style:italic;">(none extracted — upload a CIC document)</p>`;
 
-  if (data.facilities?.installments?.length) {
-    b += `<h2 style="${H2S}">INSTALLMENTS</h2>`;
-    b += tbl(FC, data.facilities.installments.map(r =>
-      [r.subject, r.lender, r.contract, r.amount, r.start, r.end, r.status, r.settled]));
-  }
-  if (data.facilities?.nonInstallments?.length) {
-    b += `<h2 style="${H2S}">NON-INSTALLMENTS / CREDIT LINES</h2>`;
-    b += tbl(FC, data.facilities.nonInstallments.map(r =>
-      [r.subject, r.lender, r.contract, r.limit, r.start, r.end, r.status, r.settled]));
-  }
-  if (data.facilities?.creditCards?.length) {
-    b += `<h2 style="${H2S}">CREDIT CARDS</h2>`;
-    b += tbl(FC, data.facilities.creditCards.map(r =>
-      [r.subject, r.lender, r.contract, r.limit, r.start, r.end, r.status, r.settled]));
-  }
+  b += `<h2 style="${H2S}">INSTALLMENTS</h2>`;
+  b += data.facilities?.installments?.length
+    ? tbl(FC, data.facilities.installments.map(r => [r.subject, r.lender, r.contract, r.amount, r.start, r.end, r.status, r.settled]))
+    : EMPTY;
+
+  b += `<h2 style="${H2S}">NON-INSTALLMENTS / CREDIT LINES</h2>`;
+  b += data.facilities?.nonInstallments?.length
+    ? tbl(FC, data.facilities.nonInstallments.map(r => [r.subject, r.lender, r.contract, r.limit, r.start, r.end, r.status, r.settled]))
+    : EMPTY;
+
+  b += `<h2 style="${H2S}">CREDIT CARDS</h2>`;
+  b += data.facilities?.creditCards?.length
+    ? tbl(FC, data.facilities.creditCards.map(r => [r.subject, r.lender, r.contract, r.limit, r.start, r.end, r.status, r.settled]))
+    : EMPTY;
 
   if (data.signoff?.length) {
     b += `<h2 style="${H2S}">SIGN-OFF</h2>`;
@@ -438,34 +591,58 @@ function triggerPrint() {
 // ── Print styles injected once ────────────────────────────────────────────────
 
 const PRINT_CSS = `
+/* Screen: hide inactive facility panels and their section labels */
+.facility-panel-hidden { display: none; }
+.facility-print-label  { display: none; }
+
+/* Screen: hide the print-only template view */
+#print-view { display: none; }
+
 @media print {
-  .topbar, .no-print { display: none !important; }
-  .page { padding: 8px 16px; max-width: 100%; }
-  .card  { break-inside: avoid; margin-bottom: 14px; box-shadow: none; border: 1px solid #ccc; }
-  table.data { break-inside: auto; font-size: 11px; }
-  tr { break-inside: avoid; }
-  .risk-hero { grid-template-columns: 160px 1fr; }
-  .risk-score { font-size: 48px; }
-  .tri { grid-template-columns: 1fr 1fr 1fr; }
-  .meta-grid { grid-template-columns: repeat(4, 1fr); }
-  h1 { font-size: 28px; }
-  .section-title { font-size: 20px; }
+  @page { margin: 1cm; size: A4 portrait; }
+
+  /* Hide everything on screen — show only the template */
+  body > * { display: none !important; }
+  #root     { display: block !important; }
+  .topbar, .no-print, .screen-layout { display: none !important; }
+
+  /* Show the template */
+  #print-view { display: block !important; }
+
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
 `;
 
-(function injectPrintCSS() {
-  if (document.getElementById("cbr-print-css")) return;
-  const s = document.createElement("style");
-  s.id = "cbr-print-css";
-  s.textContent = PRINT_CSS;
-  document.head.appendChild(s);
-})();
+// Print CSS is injected inside ReportScreen via useEffect (not at module scope).
 
 // ── ReportScreen ──────────────────────────────────────────────────────────────
 
 function ReportScreen({ data, onBack }) {
   const [wordBusy, setWordBusy] = useStateR(false);
   const [wordErr, setWordErr]   = useStateR("");
+
+  // Editable sign-off — initialized from extracted data, user can override
+  const [signoffState, setSignoffState] = useStateR(() =>
+    (data.signoff?.length ? data.signoff : [
+      { role: "Prepared by",  who: "", title: "" },
+      { role: "Follow-up by", who: "", title: "" },
+      { role: "Approved by",  who: "", title: "" },
+    ])
+  );
+  const updateSignoff = (i, field, val) =>
+    setSignoffState((prev) => prev.map((s, j) => j === i ? { ...s, [field]: val } : s));
+
+  // Inject print styles once when the report mounts (safe for HMR)
+  useEffectR(() => {
+    if (document.getElementById("cbr-print-css")) return;
+    const s = document.createElement("style");
+    s.id = "cbr-print-css";
+    s.textContent = PRINT_CSS;
+    document.head.appendChild(s);
+    return () => {
+      document.getElementById("cbr-print-css")?.remove();
+    };
+  }, []);
 
   const totalAccounts =
     (data.facilities?.installments?.length    || 0) +
@@ -503,6 +680,12 @@ function ReportScreen({ data, onBack }) {
 
   return (
     <div className="page">
+
+      {/* Template-exact print view — hidden on screen, shown when printing */}
+      <PrintView data={{ ...data, signoff: signoffState }} />
+
+      {/* ── Screen layout (hidden when printing) ── */}
+      <div id="screen-layout" className="screen-layout">
 
       {/* ── Toolbar (hidden on print) */}
       <div className="no-print hstack" style={{ marginBottom: 20, flexWrap: "wrap", gap: 8 }}>
@@ -553,8 +736,9 @@ function ReportScreen({ data, onBack }) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
           <div>
             <div className="stat-label">Risk rating</div>
-            <div className="stat-val" style={{ color: riskBorderColor, fontSize: 20 }}>
-              {data.meta.riskRating}/5 <span style={{ fontSize: 13, fontWeight: 400 }}>{data.meta.riskTier}</span>
+            <div className="stat-val" style={{ color: data.meta.riskRating > 0 ? riskBorderColor : "var(--muted)", fontSize: 20 }}>
+              {data.meta.riskRating > 0 ? `${data.meta.riskRating}/5` : "—"}
+              {" "}<span style={{ fontSize: 13, fontWeight: 400 }}>{data.meta.riskTier || ""}</span>
             </div>
           </div>
           <div>
@@ -586,32 +770,135 @@ function ReportScreen({ data, onBack }) {
         <div className="tri">
           <div>
             <h4>Summary findings</h4>
-            <ul>
-              {(data.summaryFindings || []).map((s, i) => <li key={i}>{s}</li>)}
-            </ul>
+            {(data.summaryFindings || []).length === 0 ? (
+              <p className="muted small" style={{ fontStyle: "italic" }}>
+                Upload documents and run extraction to generate findings.
+              </p>
+            ) : (
+              <ul>{data.summaryFindings.map((s, i) => <li key={i}>{s}</li>)}</ul>
+            )}
           </div>
           <div>
             <h4>Action plan</h4>
-            <ul>
-              {(data.actionPlan || []).map((s, i) => <li key={i}>{s}</li>)}
-            </ul>
+            {(data.actionPlan || []).length === 0 ? (
+              <p className="muted small" style={{ fontStyle: "italic" }}>
+                Action items will be generated after extraction.
+              </p>
+            ) : (
+              <ul>{data.actionPlan.map((s, i) => <li key={i}>{s}</li>)}</ul>
+            )}
           </div>
           <div>
             <h4>Follow-up results</h4>
             <ul>
               <li className="muted" style={{ fontStyle: "italic" }}>Pending borrower response.</li>
             </ul>
-            <hr className="soft" />
-            <h4>Sign-off</h4>
-            <div style={{ display: "grid", gap: 14 }}>
-              {(data.signoff || []).map((s, i) => (
-                <div key={i}>
-                  <div className="stat-label">{s.role}</div>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>{s.who || "—"}</div>
-                  <div className="muted small">{s.title}</div>
+          </div>
+        </div>
+
+        {/* ── Sign-off — full-width, inputs for Prepared by + Follow-up by ── */}
+        <div className="card" style={{ marginTop: 16 }}>
+          <div className="card-head">
+            <div className="card-title" style={{ fontSize: 12 }}>Sign-off</div>
+            <div className="spacer" />
+            <span className="muted small">Prepared by and Follow-up by are editable</span>
+          </div>
+          <div className="card-pad" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 0 }}>
+            {signoffState.map((s, i) => {
+              const editable   = i < 2;
+              const isApprover = i === 2;
+
+              const APPROVERS = [
+                { who: "Adnan Agha",      title: "Chief Executive Officer" },
+                { who: "Dwaipayan Mitra", title: "Chief Lending Officer"   },
+              ];
+
+              // Current dropdown value: match by name, default to first option
+              const approverValue = APPROVERS.findIndex((a) => a.who === s.who) >= 0
+                ? s.who : APPROVERS[0].who;
+
+              return (
+                <div key={i} style={{
+                  padding: "0 28px",
+                  borderRight: i < 2 ? "1px solid var(--line)" : "none",
+                }}>
+                  {/* Role label */}
+                  <div style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 10.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted)", fontWeight: 500, marginBottom: 12 }}>
+                    {s.role}
+                  </div>
+
+                  {/* Name — text input / dropdown / static */}
+                  {editable ? (
+                    <input
+                      type="text"
+                      placeholder="Name…"
+                      value={s.who || ""}
+                      onChange={(e) => updateSignoff(i, "who", e.target.value)}
+                      style={{
+                        width: "100%", fontWeight: 600, fontSize: 14,
+                        background: "transparent", border: "none",
+                        borderBottom: "1.5px solid var(--ink)", borderRadius: 0,
+                        padding: "4px 0", outline: "none",
+                      }}
+                    />
+                  ) : isApprover ? (
+                    <select
+                      value={approverValue}
+                      onChange={(e) => {
+                        const chosen = APPROVERS.find((a) => a.who === e.target.value);
+                        if (chosen) {
+                          setSignoffState((prev) => prev.map((x, j) =>
+                            j === i ? { ...x, who: chosen.who, title: chosen.title } : x
+                          ));
+                        }
+                      }}
+                      style={{
+                        width: "100%", fontWeight: 600, fontSize: 14,
+                        background: "transparent",
+                        border: "none", borderBottom: "1.5px solid var(--ink)", borderRadius: 0,
+                        padding: "4px 0", outline: "none", cursor: "pointer",
+                        appearance: "none", WebkitAppearance: "none",
+                        backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7785'/%3E%3C/svg%3E\")",
+                        backgroundRepeat: "no-repeat",
+                        backgroundPosition: "right 2px center",
+                        paddingRight: 18,
+                      }}
+                    >
+                      {APPROVERS.map((a) => (
+                        <option key={a.who} value={a.who}>{a.who}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div style={{ fontWeight: 600, fontSize: 14, paddingBottom: 4, borderBottom: "1.5px solid var(--ink)" }}>
+                      {s.who || "—"}
+                    </div>
+                  )}
+
+                  {/* Title */}
+                  {editable ? (
+                    <input
+                      type="text"
+                      placeholder="Title / role…"
+                      value={s.title || ""}
+                      onChange={(e) => updateSignoff(i, "title", e.target.value)}
+                      style={{
+                        width: "100%", fontSize: 11,
+                        fontFamily: "IBM Plex Mono, monospace",
+                        background: "transparent", border: "none",
+                        borderBottom: "1px dashed var(--line-2)", borderRadius: 0,
+                        padding: "3px 0", marginTop: 6, outline: "none",
+                        textTransform: "uppercase", color: "var(--muted)",
+                        letterSpacing: "0.05em",
+                      }}
+                    />
+                  ) : (
+                    <div style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 11, textTransform: "uppercase", color: "var(--muted)", marginTop: 6 }}>
+                      {s.title}
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -658,6 +945,7 @@ function ReportScreen({ data, onBack }) {
             }
           </div>
 
+          <GisSection gis={data.gis} />
           <CrifSection crif={data.crif || {}} />
           <ThreeWayTable rows={data.threeWay || []} />
           <NamescanSection namescan={data.namescan || []} adverseMedia={data.adverseMedia || []} />
@@ -673,8 +961,9 @@ function ReportScreen({ data, onBack }) {
         <FacilitiesSection facilities={data.facilities || { installments: [], nonInstallments: [], creditCards: [] }} />
       </div>
 
+      </div> {/* end #screen-layout */}
     </div>
   );
 }
 
-window.ReportScreen = ReportScreen;
+export default ReportScreen;

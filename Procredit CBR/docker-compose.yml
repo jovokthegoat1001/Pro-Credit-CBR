@@ -1,0 +1,39 @@
+services:
+
+  # ── Frontend (Vite build) served by nginx + reverse proxy ──────────────────
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      api-node:
+        condition: service_started
+      api-python:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Node.js Anthropic API proxy ─────────────────────────────────────────────
+  api-node:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      # Reads from host env or .env file in this directory
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+    restart: unless-stopped
+
+  # ── Python pdfplumber CIC extractor ─────────────────────────────────────────
+  api-python:
+    build:
+      context: .
+      dockerfile: Dockerfile.extractor
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:3009/health', timeout=3)"]
+      interval: 15s
+      timeout:  5s
+      retries:  3
+      start_period: 20s

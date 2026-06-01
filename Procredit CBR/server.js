@@ -1,13 +1,40 @@
-// Local dev server — serves static files + proxies Claude API calls.
-// Usage: ANTHROPIC_API_KEY=sk-... node server.js
-// Then open http://localhost:3000
+// ─────────────────────────────────────────────────────────────────────────────
+// LEGACY standalone server (pre-Vite).
+// For the bundled Vite version use:  npm run dev
+//   That starts api-server.js (port 3008) + vite dev server (port 3007).
+//
+// This file is kept for reference / fallback only.
+// Running it while Vite is active will cause EADDRINUSE on port 3007.
+// ─────────────────────────────────────────────────────────────────────────────
 
 const http = require("http");
-const fs = require("fs");
+const fs   = require("fs");
 const path = require("path");
 
 const PORT = 3007;
-const API_KEY = process.env.ANTHROPIC_API_KEY || "";
+
+// Warn loudly if Vite is already on this port
+const net = require("net");
+const probe = net.createConnection({ port: PORT, host: "127.0.0.1" });
+probe.on("connect", () => {
+  probe.destroy();
+  console.error(`\n  ✖  Port ${PORT} is already in use (Vite dev server is probably running).`);
+  console.error(`     Use  npm run dev  to start the app, not  node server.js\n`);
+  process.exit(1);
+});
+probe.on("error", () => { probe.destroy(); /* port is free — proceed */ });
+
+// Read API key: env var takes priority, then api-key.txt in the same folder
+function readApiKey() {
+  if (process.env.ANTHROPIC_API_KEY) return process.env.ANTHROPIC_API_KEY;
+  try {
+    const keyFile = path.join(__dirname, "api-key.txt");
+    return fs.readFileSync(keyFile, "utf8").trim();
+  } catch {
+    return "";
+  }
+}
+const API_KEY = readApiKey();
 
 const MIME = {
   ".html": "text/html",
@@ -53,7 +80,7 @@ async function handleComplete(req, res) {
     },
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
-      max_tokens: 4096,
+      max_tokens: 8192,
       messages: [{ role: "user", content: prompt }],
     }),
   });
@@ -93,6 +120,10 @@ server.listen(PORT, () => {
   console.log(`\n  CBR Builder running at http://localhost:${PORT}\n`);
   if (!API_KEY) {
     console.warn("  WARNING: ANTHROPIC_API_KEY is not set.");
-    console.warn("  Restart with: ANTHROPIC_API_KEY=sk-... node server.js\n");
+    console.warn("  Option 1 — create a file called  api-key.txt  in this folder");
+    console.warn("             and paste your key inside it, then restart.\n");
+    console.warn("  Option 2 — restart with:  ANTHROPIC_API_KEY=sk-... node server.js\n");
+  } else {
+    console.log("  API key loaded ✓\n");
   }
 });

@@ -1,0 +1,8 @@
+# Anthropic API proxy — no npm packages needed (built-in modules only)
+FROM node:20-alpine
+WORKDIR /app
+
+COPY api-server.js ./
+
+EXPOSE 3008
+CMD ["node", "api-server.js"]
