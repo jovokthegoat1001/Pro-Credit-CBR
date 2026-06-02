@@ -10,6 +10,9 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 const CHUNK_SIZE         = 20000;
 const MAX_CHUNKS_SUMMARY = 5;
 
+const API_URL       = import.meta.env.VITE_API_URL       || "";
+const EXTRACTOR_URL = import.meta.env.VITE_EXTRACTOR_URL || "";
+
 // ── PDF reader ────────────────────────────────────────────────────────────────
 
 export async function filesToText(fileOrArr) {
@@ -102,7 +105,7 @@ async function fileToTextPython(file) {
   try {
     const fd = new FormData();
     fd.append("file", file);
-    const res = await fetch("/api/extract-text", { method: "POST", body: fd });
+    const res = await fetch(EXTRACTOR_URL + "/api/extract-text", { method: "POST", body: fd });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     if (data.error) throw new Error(data.error);
@@ -125,7 +128,7 @@ async function filesToTextPython(fileOrArr) {
 // ── Claude helper ─────────────────────────────────────────────────────────────
 
 async function claudeComplete(prompt) {
-  const res = await fetch("/api/complete", {
+  const res = await fetch(API_URL + "/api/complete", {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
     body:    JSON.stringify({ prompt }),
@@ -205,7 +208,7 @@ async function extractCICPython(fileOrArr) {
     try {
       const fd  = new FormData();
       fd.append("file", file);
-      const res = await fetch("/api/extract-cic", { method: "POST", body: fd });
+      const res = await fetch(EXTRACTOR_URL + "/api/extract-cic", { method: "POST", body: fd });
       if (!res.ok) { console.warn(`[Python extractor] HTTP ${res.status} for ${file.name}`); continue; }
       const data = await res.json();
       if (data.error) { console.warn("[Python extractor]", data.error); continue; }
