@@ -88,6 +88,12 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === "OPTIONS") { res.writeHead(204); res.end(); return; }
 
+  if (req.method === "GET" && req.url === "/health") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ ok: true }));
+    return;
+  }
+
   if (req.method === "POST" && req.url === "/api/complete") {
     try { await handleComplete(req, res); }
     catch (e) { res.writeHead(500); res.end(String(e)); }
